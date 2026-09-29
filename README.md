@@ -1,93 +1,127 @@
-# Tools
+# PixPack
 
+把一个文件或整个文件夹无损打包成一张或多张 PNG，再按原来的样子还原。支持 Windows 和 macOS。
 
+图片看起来像彩噪点，它不是给人看的，只是一个不丢字节的容器。源是单个文件还是文件夹，会写进图片头里；还原时按这个标记自动处理，不用自己选择。
 
-## Getting started
+![PixPack 打包界面](docs/screenshot.png)
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## 原理
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+1. 按相对路径把内容打成 zip。已经压缩过的文件默认不再二次压缩。
+2. 在字节流前面加上 `PX01` 文件头：张数、序号、偏移、CRC32、整包 SHA-256，以及「单个文件 / 文件夹」标记。
+3. 按行把字节写入 RGB 像素，每像素 3 字节，保存为 PNG。内存里只保留一行，不会把整张图再压缩一遍。
+4. 解码时按行读像素、校验，拼到临时 zip，再按原相对路径写出。
 
-## Add your files
+默认单张最大边长 4096。装不下就自动分成多张，也可以用 `--parts` 指定张数。边长有上限，按本机当前剩余内存计算，避免一张图把内存打满。
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+**不要把 PNG 转成 JPEG，不要缩放，也不要经过会重新压缩图片的聊天软件或网盘预览。** 像素一变，文件就坏了。
 
+## 环境
+
+- Windows 10 或更新版本，或 macOS 11 或更新版本
+- Python 3.10 或更新版本（图形界面还需要本机的 Tk）
+- 依赖只有 [Pillow](https://python-pillow.org/)
+
+Windows 上的图形界面用 `Microsoft YaHei UI`，macOS 上用 `PingFang SC`。打开输出目录时，Windows 调用资源管理器，macOS 调用 `open`。
+
+## 安装
+
+```bash
+python3 -m pip install -r requirements.txt
 ```
-cd existing_repo
-git remote add origin http://tygit.tuyoo.com/ark/client/tools.git
-git branch -M main
-git push -uf origin main
+
+Windows 上如果 `python3` 不可用，把下面的命令换成 `py -3`。
+
+## 图形界面
+
+```bash
+python3 pixpack_gui.py
 ```
 
-## Integrate with your tools
+窗口分「打包成图片」和「从图片还原」两页。处理在后台进行，可以取消。进度条在统计阶段来回走动；开始写入后按已处理字节显示百分比。大约 70% 之前是在打包 zip，之后是在生成 PNG。
 
-- [ ] [Set up project integrations](http://tygit.tuyoo.com/ark/client/tools/-/settings/integrations)
+点「预览规模」只估算张数、像素和大约体积，不写文件。极速模式的张数是算出来的；压缩模式的张数是偏大的估计。
 
-## Collaborate with your team
+还原时只选择一个文件夹：
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+- 标记为单个文件：按原来的文件名写进这个文件夹
+- 标记为文件夹：按原来的相对路径展开，空目录也会保留
 
-## Test and Deploy
+## 命令行
 
-Use the built-in continuous integration in GitLab.
+```bash
+# 尽量打成较少的几张。边长不超过本机允许的最大值，默认目标是 4096
+python3 pixpack.py pack /path/to/source /path/to/out-images
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+# 指定打成 4 张
+python3 pixpack.py pack /path/to/source /path/to/out-images --parts 4
 
-***
+# 不压缩，适合大量小文件或本身已经压缩过的内容
+python3 pixpack.py pack /path/to/source /path/to/out-images --level 0
 
-# Editing this README
+# 从整个目录还原。最后一个参数是还原文件夹
+# 目录里的无关 PNG 会跳过；不要把两组 pixpack 图片放在一起
+python3 pixpack.py unpack /path/to/out-images /path/to/restored
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+# 也可以点名这几张图
+python3 pixpack.py unpack a.png b.png /path/to/restored
 
-## Suggestions for a good README
+# 查看张数、来源标记、校验和文件列表
+python3 pixpack.py info /path/to/out-images
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+# 往返自检
+python3 pixpack.py selftest
+```
 
-## Name
-Choose a self-explaining name for your project.
+Windows 也可以用 `pixpack.bat`，macOS 可以用 `./pixpack.sh`。两者都只是转去调用 `pixpack.py`，当前工作目录保持不变。
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+常用参数：
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+| 参数 | 作用 |
+| --- | --- |
+| `--max-side` | 单张最大边长。超过本机内存上限会被拒绝 |
+| `--parts` | 指定张数。省略则在边长限制内尽量少张 |
+| `--level` | zip 压缩级别 0–9。`0` 只打包不压缩，默认 `1` |
+| `--no-store-compressed` | 图片、视频、压缩包等也重新压缩，文件多时会很慢 |
+| `--prefix` | 输出文件名前缀，默认 `pixpack` |
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+还原结果与源的相对路径、文件内容一致。符号链接会跳过。若输出目录就在源目录里面，打包时会自动避开这些 PNG，避免把自己再包进去。
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+## 从源码构建
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+构建必须在目标系统上做。PyInstaller 不能在 Windows 上直接打出 macOS 应用。
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+安装构建依赖：
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+```bash
+python3 -m pip install -r requirements.txt -r requirements-build.txt
+```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+### Windows
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+在 `pixpack` 目录执行：
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+```bat
+build_exe.bat
+```
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+生成 `dist\PixPack.exe`。脚本使用 Windows 换行；如果正在运行旧的 PixPack，会先关掉它再覆盖。第一次打开这个单文件 exe 会稍慢，因为它要先解出运行环境。
 
-## License
-For open source projects, say how it is licensed.
+### macOS
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+```bash
+chmod +x build_mac.sh pixpack.sh
+./build_mac.sh
+```
+
+生成 `dist/PixPack.app`。双击即可打开。脚本会先尝试退出已经在运行的 PixPack，然后调用 PyInstaller。产物标识是 `dev.pixpack.app`。
+
+macOS 上的图形界面依赖系统自带的 Tk。如果窗口打不开，先确认这套 Python 能执行 `python3 -m tkinter`。
+
+## 限制
+
+- 只保证普通文件和空目录。不保留权限、时间戳和符号链接。
+- 解压会拒绝 `..` 和绝对路径，避免 zip 路径穿越。
+- 体积大约是 zip 大小的 1/3 个像素，再加 PNG 封装。jpg、mp4、zip 这类已经压缩过的内容不会明显变小。
+- 以前没有来源标记的旧图，还原时按文件夹处理。
