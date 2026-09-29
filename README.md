@@ -4,7 +4,7 @@
 
 图片看起来像彩噪点，它不是给人看的，只是一个不丢字节的容器。源是单个文件还是文件夹，会写进图片头里；还原时按这个标记自动处理，不用自己选择。
 
-![PixPack 打包界面](docs/screenshot.png)
+![PixPack 打包界面](pixpack/docs/screenshot.png)
 
 ## 原理
 
